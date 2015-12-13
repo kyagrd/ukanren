@@ -243,6 +243,21 @@ membr a s = fresh $ \(x,xs) -> eq s (cons x xs) >> (eq a x <|> membr a xs)
 ((),(22,fromList [(0,V 2),(1,V 3),(3,L [A "cons",V 4,V 5]),(5,L [A "cons",V 6,V 7]),(7,L [A "cons",V 8,V 9]),(9,L [A "cons",V 10,V 11]),(11,L [A "cons",V 12,V 13]),(13,L [A "cons",V 14,V 15]),(15,L [A "cons",V 16,V 17]),(17,L [A "cons",V 18,V 19]),(19,L [A "cons",V 20,V 21]),(20,A "a")]))
 -}
 
+-- list membrership with guarded by (/==) in Prolog
+-- 
+-- memb(A,[A|_ ]).
+-- memb(A,[X|Xs]) :- A /== X, memb(A,Xs).
+--
+memb :: Term -> Term -> Goal
+memb a s = fresh $ \(x,xs) -> eq s (cons a xs) <|>
+                          do{ eq s (cons x xs); a /== x; memb a xs }
+
+(/==) :: Term -> Term -> Goal
+a /== b = do a_ <- expand a
+             b_ <- expand b
+             guard (a_ /= b_)
+
+
 test t = take 10 $ runK t start
 
 tst t = mapM_ print $ test t
