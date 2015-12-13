@@ -165,6 +165,15 @@ aAndB = do fresh $ \a -> eq a (A "7")
            fresh $ \b -> eq b (A "5") <|> eq b (A "6")
 
 
+
+test t = take 10 $ runK t start
+
+tst t = mapM_ print $ test t
+
+
+---------------------------------------------------------------
+---------------------------------------------------------------
+
 -- for building list terms
 nil :: Term
 nil = A "nil"
@@ -260,9 +269,4 @@ memb a s = fresh $ \(x,xs) -> eq s (cons a xs) <|>
 a /== b = do a_ <- expand a
              b_ <- expand b
              guard (a_ /= b_)
-
-
-test t = take 10 $ runK t start
-
-tst t = mapM_ print $ test t
 
