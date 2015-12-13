@@ -185,7 +185,7 @@ cons x xs = L [A "cons", x, xs]
 -- Prolog's usual list membership
 --
 -- member(A,[A|_ ]).
--- member(A,[X|Xs]) :- member(X,Xs).
+-- member(A,[X|Xs]) :- member(A,Xs).
 --
 member :: Term -> Term -> Goal
 member a s = fresh $ \(x,xs) -> eq s (cons a xs) <|>
