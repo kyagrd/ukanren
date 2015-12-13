@@ -1,3 +1,4 @@
+-- vim: ts=2: sw=2: expandtab: ai:
 {-# LANGUAGE FlexibleInstances #-}
 module MicroKanren where
 
@@ -5,14 +6,15 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.State.Strict hiding (State)
 
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
 
 type Var = Int
 
-data Atom = Int Int
-            deriving (Show, Eq, Ord)
+type Atom = String
+-- data Atom = Int Int
+--        deriving (Show, Eq, Ord)
 
 data Term = V Var
           | A Atom
@@ -33,6 +35,7 @@ interleaves :: [[a]] -> [a]
 interleaves [] = []
 interleaves l = [x | x:_ <- l] ++ interleaves [xs | _:xs <- l]
 
+interleave :: [a] -> [a] -> [a]
 interleave a b = interleaves [a,b]
 
 
@@ -54,9 +57,11 @@ instance Alternative Tree where empty = Empty; (<|>) = Node
 
 -- Search strategies over Trees.
 listify :: ([a] -> [a] -> [a]) -> Tree a -> [a]
-listify f Empty = []
-listify f (Single a) = [a]
+listify _ Empty = []
+listify _ (Single a) = [a]
 listify f (Node l r) = f (listify f l) (listify f r)
+
+dfs, ifs, bfs :: Tree a -> [a]
 
 dfs = listify (++)
 
@@ -108,7 +113,7 @@ expand t@(V v) = fromMaybe t <$> deref v
 expand t = return t
 
 eq :: Term -> Term -> Goal
-eq x y = join $ e <$> expand x <*> expand y
+eq t1 t2 = join $ e <$> expand t1 <*> expand t2
     where
       e (V x) (V y) | x == y = ok
       e (V x) t = assign x t
@@ -143,15 +148,51 @@ instance (Fresh a, Fresh b, Fresh c, Fresh d, Fresh e) => Fresh (a,b,c,d,e)where
 
 -- Test cases
 five :: Goal
-five = fresh (\x -> eq x (A (Int 5)))
+five = fresh $ \x -> eq x (A "5")
 
-fives_ x = eq x (A (Int 5)) <|> fives_ x
+fives :: Goal
 fives = fresh fives_
+-- where
+fives_ x = eq x (A "5") <|> fives_ x
 
-fivesR_ x = fivesR_ x <|> eq x (A (Int 5))
+fivesR :: Goal
 fivesR = fresh fivesR_
+-- where
+fivesR_ x = fivesR_ x <|> eq x (A "5")
 
-aAndB = do fresh $ \a -> eq a (A (Int 7))
-           fresh $ \b -> eq b (A (Int 5)) <|> eq b (A (Int 6))
+aAndB :: Goal
+aAndB = do fresh $ \a -> eq a (A "7")
+           fresh $ \b -> eq b (A "5") <|> eq b (A "6")
+
+
+-- Prolog's usual list membership
+member :: Term -> Term -> Goal
+member a s = fresh $ \(x,t) ->
+  do { eq s (L [A "cons", x, t])
+     ; eq a x <|> memb a t
+     }
+{-
+*MicroKanren> tst (A "a" `member` L[A "cons", A "a", A "nil"])
+((),(2,fromList [(0,A "a"),(1,A "nil")]))
+*MicroKanren> tst (A "a" `member` L[A "cons", A "a", A "nil"])
+((),(2,fromList [(0,A "a"),(1,A "nil")]))
+*MicroKanren> tst (fresh $ \s -> A "a" `member` s)
+((),(3,fromList [(0,L [A "cons",V 1,V 2]),(1,A "a")]))
+((),(5,fromList [(0,L [A "cons",V 1,V 2]),(2,L [A "cons",V 3,V 4]),(3,A "a")]))
+-}
+
+-- list membership with non-logical comparision (/==) in Prolog
+memb :: Term -> Term -> Goal
+memb a s = fresh $ \(x,t) ->
+  do { eq s (L [A "cons", x, t])
+     ; eq a x <|> if a/=x then memb a t else fail (show a++" /= "++ show x)
+     }
+{-
+for most trivial cases runs same as the member ...
+TODO: I should really make a test that makes this different
+-}
 
 test t = take 10 $ runK t start
+
+tst t = mapM_ print $ test t
+
