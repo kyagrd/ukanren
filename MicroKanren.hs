@@ -251,6 +251,10 @@ membr a s = fresh $ \(x,xs) -> eq s (cons x xs) >> (eq a x <|> membr a xs)
 memb :: Term -> Term -> Goal
 memb a s = fresh $ \(x,xs) -> eq s (cons a xs) <|>
                           do{ eq s (cons x xs); a /== x; memb a xs }
+{-
+*MicroKanren> tst (fresh $ \(x,xs) -> x `memb` cons x xs)
+((),(4,fromList [(1,V 3)]))
+ -}
 
 (/==) :: Term -> Term -> Goal
 a /== b = do a_ <- expand a
