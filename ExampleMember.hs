@@ -61,8 +61,8 @@ membr a s = fresh $ \(x,xs) -> eq s (cons x xs) >> (eq a x <|> membr a xs)
 
 
 -- list membrership with guarded by (/==) in Prolog.
--- Reduces search space in case of quering an uninstantiated and the list
--- happens to contain that same variable.
+-- Reduces search space in case of quering an uninstantiated variable
+-- and the list happens to contain that same variable.
 -- 
 -- memb(A,[A|_ ]).
 -- memb(A,[X|Xs]) :- A /== X, memb(A,Xs).
