@@ -6,6 +6,7 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.State.Strict hiding (State)
 
+import Data.List (sort)
 import Data.Maybe (fromMaybe)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
@@ -20,7 +21,39 @@ data Term = V Var
           | A Atom
           | L [Term]
           | S [Term]
-            deriving (Show, Eq, Ord)
+            deriving (Eq,Ord,Show)
+{-
+instance Eq Term where
+  V x  == V y  = x==y
+  A a  == A b  = a==b
+  L ts == L us = and $ zipWith (==) ts us
+  S ts == S us = uniq(sort ts) == uniq(sort us)
+  _    == _    = False
+
+instance Ord Term where
+   V x  <= V y  = x <= y
+   V _  <= _    = True
+   A a  <= A b  = a <= b
+   A _  <= _    = True
+   L ts <= L us = ts <= us
+   L _  <= _    = True
+   S ts <= S us = uniq(sort ts) <= uniq(sort us)
+
+   V x  < V y  = x < y
+   V _  < _    = True
+   A a  < A b  = a < b
+   A _  < _    = True
+   L ts < L us = ts < us
+   L _  < _    = True
+   S ts < S us = uniq(sort ts) < uniq(sort us)
+-}
+
+usort xs = uniq $ sort xs
+
+uniq [] = []
+uniq [x] = [x]
+uniq (x:y:xs) | x == y    = x : xs
+              | otherwise = x : uniq (y:xs)
 
 type Subst = IntMap Term
 type State = (Var, Subst)
@@ -121,8 +154,8 @@ eq t1 t2 = join $ e <$> expand t1 <*> expand t2
       e t (V x) = assign x t
       e (A x) (A y) | (x == y) = ok
       e (L xs) (L ys) | length xs == length ys = zipWithM_ eq xs ys
-      e (S xs) (S ys) = conjs $ interleaves [ [x `in_` ys|x<-xs]
-                                            , [y `in_` xs|y<-ys] ]
+      e (S xs) (S ys) = conjs $ [x `in_` ys|x<-xs]
+                             ++ [y `in_` xs|y<-ys]
       e _ _ = mzero
       -- hard-wired implemention of memb inside Kanren unification
       in_ t (z:zs) = eq t z <|> do{ t/==z; in_ t zs } 
