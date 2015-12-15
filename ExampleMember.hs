@@ -75,9 +75,4 @@ memb a s = fresh $ \(x,xs) -> eq s (cons a xs) <|>
 ((),(4,fromList [(1,V 3)]))
  -}
 
--- implemetation of Prolog's (/==) in microKanren
-(/==) :: Term -> Term -> Goal
-a /== b = do a_ <- expand a
-             b_ <- expand b
-             guard (a_ /= b_)
 

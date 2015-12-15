@@ -19,6 +19,7 @@ type Atom = String
 data Term = V Var
           | A Atom
           | L [Term]
+          | S [Term]
             deriving (Show, Eq, Ord)
 
 type Subst = IntMap Term
@@ -120,7 +121,19 @@ eq t1 t2 = join $ e <$> expand t1 <*> expand t2
       e t (V x) = assign x t
       e (A x) (A y) | (x == y) = ok
       e (L xs) (L ys) | length xs == length ys = zipWithM_ eq xs ys
+      e (S xs) (S ys) = conjs $ interleaves [ [x `in_` ys|x<-xs]
+                                            , [y `in_` xs|y<-ys] ]
       e _ _ = mzero
+      -- hard-wired implemention of memb inside Kanren unification
+      in_ t (z:zs) = eq t z <|> do{ t/==z; in_ t zs } 
+      in_ t [] = mzero
+
+-- implemetation of Prolog's (/==) in microKanren
+(/==) :: Term -> Term -> Goal
+a /== b = do a_ <- expand a
+             b_ <- expand b
+             guard (a_ /= b_)
+
 
 disj, conj :: Goal -> Goal -> Goal
 disj = (<|>)
@@ -172,6 +185,16 @@ tst t = mapM_ print $ test t
 
 
 ---------------------------------------------------------------
----------------------------------------------------------------
 
-
+{- finite set unification
+*MicroKanren> tst (fresh $ \(x,y) -> do{S [y,x] `eq` S [x,y]})
+((),(2,fromList [(1,V 0)]))
+((),(2,fromList [(0,V 1)]))
+((),(2,fromList []))
+*MicroKanren> tst (fresh $ \(x,y) -> do{x `eq` A"a";S [y,x] `eq` S [x,y]})
+((),(2,fromList [(0,A "a"),(1,A "a")]))
+((),(2,fromList [(0,A "a"),(1,A "a")]))
+((),(2,fromList [(0,A "a")]))
+*MicroKanren> tst (fresh $ \(x,y) -> do{x `eq` A"a";S [y,x] `eq` S [x,y];y `eq` A"b"})
+((),(2,fromList [(0,A "a"),(1,A "b")]))
+-}
