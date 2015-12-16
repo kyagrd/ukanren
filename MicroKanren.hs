@@ -21,38 +21,46 @@ data Term = V Var
           | A Atom
           | L [Term]
           | S [Term]
-            deriving (Eq,Ord,Show)
-{-
+            deriving (Show)
+
 instance Eq Term where
   V x  == V y  = x==y
   A a  == A b  = a==b
   L ts == L us = and $ zipWith (==) ts us
-  S ts == S us = uniq(sort ts) == uniq(sort us)
+  S ts == S us = usort ts == usort us
   _    == _    = False
 
+-- maybe there is a generic programming solution to this
 instance Ord Term where
    V x  <= V y  = x <= y
    V _  <= _    = True
+   A _  <= V _  = False
    A a  <= A b  = a <= b
    A _  <= _    = True
+   L _  <= V _  = False
+   L _  <= A _  = False
    L ts <= L us = ts <= us
    L _  <= _    = True
-   S ts <= S us = uniq(sort ts) <= uniq(sort us)
+   S ts <= S us = usort ts <= usort us
+   S _  <= _    = False
 
    V x  < V y  = x < y
    V _  < _    = True
    A a  < A b  = a < b
    A _  < _    = True
+   L _  < V _  = False
+   L _  < A _  = False
    L ts < L us = ts < us
    L _  < _    = True
-   S ts < S us = uniq(sort ts) < uniq(sort us)
--}
+   S ts < S us = usort ts < usort us
+   S _  < _    = False
+
 
 usort xs = uniq $ sort xs
 
 uniq [] = []
 uniq [x] = [x]
-uniq (x:y:xs) | x == y    = x : xs
+uniq (x:y:xs) | x == y    = uniq (y:xs)
               | otherwise = x : uniq (y:xs)
 
 type Subst = IntMap Term
@@ -154,8 +162,10 @@ eq t1 t2 = join $ e <$> expand t1 <*> expand t2
       e t (V x) = assign x t
       e (A x) (A y) | (x == y) = ok
       e (L xs) (L ys) | length xs == length ys = zipWithM_ eq xs ys
-      e (S xs) (S ys) = conjs $ [x `in_` ys|x<-xs]
-                             ++ [y `in_` xs|y<-ys]
+      e (S xs) (S ys) = conjs $ [x `in_` ys'|x<-xs'] ++ [y `in_` xs'|y<-ys']
+                      where
+                      xs' = usort xs
+                      ys' = usort ys
       e _ _ = mzero
       -- hard-wired implemention of memb inside Kanren unification
       in_ t (z:zs) = eq t z <|> do{ t/==z; in_ t zs } 
@@ -231,3 +241,21 @@ tst t = mapM_ print $ test t
 *MicroKanren> tst (fresh $ \(x,y) -> do{x `eq` A"a";S [y,x] `eq` S [x,y];y `eq` A"b"})
 ((),(2,fromList [(0,A "a"),(1,A "b")]))
 -}
+
+-- set example
+
+ex1 = fresh $ \x-> S[x,x,x,x,x] `eq` S [x]
+ex2 = fresh $ \(x,y) -> S[x] `eq` S [x,y]
+ex3 = fresh $ \(x,y) -> S[x,x] `eq` S [x,y]
+ex4 = fresh $ \(x,y) -> S[x,x,x] `eq` S [x,y]
+ex5 = fresh $ \(x,y) -> S[x,x,y,x,x] `eq` S [x,y]
+ex6 = fresh $ \(x,y) -> S[x,x,y,x,x] `eq` S [x,y,y,y]
+ex7 = fresh $ \(x,y) -> S[x,x,y,x,x] `eq` S [x,y,y,y,x,x]
+
+ex8 = fresh $ \(x,y) -> do{S [y,x] `eq` S [x,y]}
+
+ex9 = fresh $ \x -> S [x] `eq` x -- we don't have occurs check here
+
+-- infinite loop ... here we really need occurs check
+ex10 = fresh $ \x -> S[S [x]] `eq` S [x]
+
