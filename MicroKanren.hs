@@ -23,6 +23,9 @@ data Term = V Var
           | S [Term]
             deriving (Show)
 
+
+-- there may be a generic programming solution to these Eq and Ord instances
+
 instance Eq Term where
   V x  == V y  = x==y
   A a  == A b  = a==b
@@ -30,7 +33,6 @@ instance Eq Term where
   S ts == S us = usort ts == usort us
   _    == _    = False
 
--- maybe there is a generic programming solution to this
 instance Ord Term where
    V x  <= V y  = x <= y
    V _  <= _    = True
@@ -162,21 +164,35 @@ eq t1 t2 = join $ e <$> expand t1 <*> expand t2
       e t (V x) = assign x t
       e (A x) (A y) | (x == y) = ok
       e (L xs) (L ys) | length xs == length ys = zipWithM_ eq xs ys
-      e (S xs) (S ys) = conjs $ [x `in_` ys'|x<-xs'] ++ [y `in_` xs'|y<-ys']
-                      where
-                      xs' = usort xs
-                      ys' = usort ys
+      -- hack to make ex10 and ex10' stop looping instead of calling
+      -- eq inside in_ function but is this really ok? Maybe having
+      -- an occurs check by default might be the right way
+      e (S xs) (S ys) = do xs' <- usort <$> mapM expand xs
+                           ys' <- usort <$> mapM expand ys
+                           conjs $ interleave [x `in_` ys'|x<-xs']
+                                              [y `in_` xs'|y<-ys']
+      e _ _ = mzero
+      -- hard-wired implemention of memb inside Kanren unification
+      in_ t (z:zs) = e t z <|> do{ t/==z; in_ t zs } 
+      in_ t [] = mzero
+{-
+      e (S xs) (S ys) = conjs $ interleave [x `in_` ys'|x<-xs']
+                                           [y `in_` xs'|y<-ys']
+                      where xs' = usort xs
+                            ys' = usort ys
       e _ _ = mzero
       -- hard-wired implemention of memb inside Kanren unification
       in_ t (z:zs) = eq t z <|> do{ t/==z; in_ t zs } 
       in_ t [] = mzero
+-}
 
 -- implemetation of Prolog's (/==) in microKanren
 (/==) :: Term -> Term -> Goal
-a /== b = do a_ <- expand a
-             b_ <- expand b
-             guard (a_ /= b_)
-
+a /== b = guard =<< (/=) <$> (expand a) <*> (expand b)
+--        do a' <- expand a
+--           b' <- expand b
+--           guard (a' /= b')
+--
 
 disj, conj :: Goal -> Goal -> Goal
 disj = (<|>)
@@ -254,8 +270,12 @@ ex7 = fresh $ \(x,y) -> S[x,x,y,x,x] `eq` S [x,y,y,y,x,x]
 
 ex8 = fresh $ \(x,y) -> do{S [y,x] `eq` S [x,y]}
 
-ex9 = fresh $ \x -> S [x] `eq` x -- we don't have occurs check here
 
--- infinite loop ... here we really need occurs check
+-- occurs check needed to need to prevent this kind of strange things below
+ex9 = fresh $ \x -> S [x] `eq` x
+ex9'= fresh $ \x -> x `eq` S [x]
+
+-- this even infinite loops
 ex10 = fresh $ \x -> S[S [x]] `eq` S [x]
+ex10'= fresh $ \x -> S [x] `eq` S[S [x]]
 
