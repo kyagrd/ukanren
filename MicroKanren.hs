@@ -156,6 +156,8 @@ expand :: Term -> K Term
 expand t@(V v) = fromMaybe t <$> deref v
 expand t = return t
 
+-- Finite set unification baked in but this way cannot do set union
+-- set member, etc, in a logical way. Only unification ...
 eq :: Term -> Term -> Goal
 eq t1 t2 = join $ e <$> expand t1 <*> expand t2
     where
@@ -181,18 +183,16 @@ eq t1 t2 = join $ e <$> expand t1 <*> expand t2
                       where xs' = usort xs
                             ys' = usort ys
       e _ _ = mzero
-      -- hard-wired implemention of memb inside Kanren unification
-      in_ t (z:zs) = eq t z <|> do{ t/==z; in_ t zs } 
-      in_ t [] = mzero
 -}
 
 -- implemetation of Prolog's (/==) in microKanren
 (/==) :: Term -> Term -> Goal
 a /== b = guard =<< (/=) <$> (expand a) <*> (expand b)
---        do a' <- expand a
---           b' <- expand b
---           guard (a' /= b')
---
+{-
+          do a' <- expand a
+             b' <- expand b
+             guard (a' /= b')
+-}  
 
 disj, conj :: Goal -> Goal -> Goal
 disj = (<|>)
@@ -214,7 +214,7 @@ instance (Fresh a, Fresh b, Fresh c) => Fresh (a,b,c) where
     fresh f = fresh (\a -> fresh (\(b,c) -> f (a,b,c)))
 instance (Fresh a, Fresh b, Fresh c, Fresh d) => Fresh (a,b,c,d) where
     fresh f = fresh (\(a,b) -> fresh (\(c,d) -> f (a,b,c,d)))
-instance (Fresh a, Fresh b, Fresh c, Fresh d, Fresh e) => Fresh (a,b,c,d,e)where
+instance (Fresh a, Fresh b, Fresh c, Fresh d, Fresh e) => Fresh (a,b,c,d,e) where
     fresh f = fresh (\(a,b,c) -> fresh (\(d,e) -> f (a,b,c,d,e)))
 
 
