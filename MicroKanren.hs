@@ -153,7 +153,8 @@ ok :: Goal
 ok = pure ()
 
 expand :: Term -> K Term
-expand t@(V v) = fromMaybe t <$> deref v
+expand t@(V v) = do t' <- fromMaybe t <$> deref v
+                    if t' == t then return t else expand t'
 expand t = return t
 
 -- Finite set unification baked in but this way cannot do set union
