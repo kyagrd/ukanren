@@ -76,3 +76,9 @@ memb a s = fresh $ \(x,xs) -> eq s (cons a xs) <|>
  -}
 
 
+subset_of :: Term -> Term -> Goal
+subset_of s1 s2 = fresh $ \(x,xs) -> 
+  eq s1 nil <|> do { eq s1 (cons x xs); memb x s2; subset_of xs s2 }
+
+sunify :: Term -> Term -> Goal
+sunify s1 s2 = do { subset_of s1 s2; subset_of s2 s1 }
