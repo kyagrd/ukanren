@@ -8,10 +8,12 @@ import Control.Monad
 
 -- for building list terms
 nil :: Term
-nil = A "nil"
+nil = a_nil
 cons :: Term -> Term -> Term
-cons x xs = L [A "cons", x, xs]
+cons x xs = L [a_cons, x, xs]
 
+a_nil = A "nil"
+a_cons = A "cons"
 
 -- Prolog's usual list membership
 --
@@ -82,5 +84,3 @@ subset_of s1 s2 = fresh $ \(x,xs) ->
 
 sunify :: Term -> Term -> Goal
 sunify s1 s2 = do { subset_of s1 s2; subset_of s2 s1 }
-
-
