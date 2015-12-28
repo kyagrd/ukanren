@@ -77,6 +77,17 @@ memb a s = fresh $ \(x,xs) -> eq s (cons a xs) <|>
 ((),(4,fromList [(1,V 3)]))
  -}
 
+a_pair = A "pair"
+pair x y = L [a_pair, x, y] 
+
+first :: Term -> Term -> Term -> Goal
+first k v ctx = fresh $ \(k1,v1,ps) ->
+  do { ctx `eq` cons (pair k1 v1) ps
+     ; do { k `eq` k1; v `eq` v1 }
+       <|>
+       do { k /== k1; first k v ps }
+     }
+
 
 subset_of :: Term -> Term -> Goal
 subset_of s1 s2 = fresh $ \(x,xs) -> 
