@@ -152,10 +152,22 @@ execK k st = map snd (runK k st)
 ok :: Goal
 ok = pure ()
 
+-- expands variables at the top level until no change
 expand :: Term -> K Term
 expand t@(V v) = do t' <- fromMaybe t <$> deref v
                     if t' == t then return t else expand t'
 expand t = return t
+
+-- expands variables inside L and S
+expand' :: Term -> K Term
+expand' t@(V _) = do t' <- expand t
+                     case t' of
+                       V _ -> return t
+                       _ -> expand' t'
+expand' t@(A _) = return t
+expand' (L ts) = L <$> mapM expand' ts
+expand' (S ts) = S <$> mapM expand' ts
+
 
 -- Finite set unification baked in but this way cannot do set union
 -- set member, etc, in a logical way. Only unification ...
@@ -258,22 +270,4 @@ tst t = mapM_ print $ test t
 *MicroKanren> tst (fresh $ \(x,y) -> do{x `eq` A"a";S [y,x] `eq` S [x,y];y `eq` A"b"})
 ((),(2,fromList [(0,A "a"),(1,A "b")]))
 -}
-
--- set example
-
-ex1 = fresh $ \x-> S[x,x,x,x,x] `eq` S [x]
-ex2 = fresh $ \(x,y) -> S[x] `eq` S [x,y]
-ex3 = fresh $ \(x,y) -> S[x,x] `eq` S [x,y]
-ex4 = fresh $ \(x,y) -> S[x,x,x] `eq` S [x,y]
-ex5 = fresh $ \(x,y) -> S[x,x,y,x,x] `eq` S [x,y]
-ex6 = fresh $ \(x,y) -> S[x,x,y,x,x] `eq` S [x,y,y,y]
-ex7 = fresh $ \(x,y) -> S[x,x,y,x,x] `eq` S [x,y,y,y,x,x]
-
-ex8 = fresh $ \(x,y) -> do{S [y,x] `eq` S [x,y]}
-
-ex9 = fresh $ \x -> S [x] `eq` x
-ex9'= fresh $ \x -> x `eq` S [x]
-
-ex10 = fresh $ \x -> S[S [x]] `eq` S [x]
-ex10'= fresh $ \x -> S [x] `eq` S[S [x]]
 

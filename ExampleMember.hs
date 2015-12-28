@@ -82,3 +82,5 @@ subset_of s1 s2 = fresh $ \(x,xs) ->
 
 sunify :: Term -> Term -> Goal
 sunify s1 s2 = do { subset_of s1 s2; subset_of s2 s1 }
+
+
