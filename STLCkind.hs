@@ -19,6 +19,7 @@ arr a b = L [a_arr, a, b]
 
 star = L [a_o]
 
+
 kind_ kc t k =
   -- kind(KC, var(X), K) :- first (X:K) KC.
   ( fresh $ \x -> do{ t `eq` var x; first x k kc } )
@@ -26,7 +27,7 @@ kind_ kc t k =
   -- kind(KC, app(F,A), K) :- kind(KC, F, arr(Ka,K)), kind(KC,A,Ka).
   ( fresh $ \(f, a, ka) -> do{ t `eq` app f a;
                              ; kind_ kc f (arr ka k) 
-                             ; type_ kc a ka
+                             ; kind_ kc a ka
                              } )
   <|>
   -- kind(KC, arr(A,B), o) :- kind(KC, A, star), kind(KC,B,star).
@@ -38,22 +39,50 @@ kind_ kc t k =
 
 
 
-type_ ctx tm ty =
-  -- type(Ctx, var(X), Ty) :- first (X:Ty) Ctx.
-  ( fresh $ \x -> do{ tm `eq` var x; first x ty ctx } )
+type_ kc ctx tm ty =
+  -- type(KC, C, var(X), Ty) :- first (X:Ty) C.
+  ( fresh $ \x -> do{ tm `eq` var x; first x ty ctx; return [] } )
   <|>
-  -- type(Ctx, app(F,E), Ty) :- type(Ctx, F, arr(Te,Ty)), type(Ctx,E,Te).
+  -- type(KC, C, app(F,E), Ty) :- type(C, F, arr(Te,Ty)), type(C,E,Te).
   ( fresh $ \(f, e, te) -> do{ tm `eq` app f e;
-                             ; type_ ctx f (arr te ty) 
-                             ; type_ ctx e te
+                             ; gs1 <- type_ kc ctx f (arr te ty)
+                             ; gs2 <- type_ kc ctx e te
+                             ; return $ gs1++gs2
                              } )
   <|>
-  -- type(Ctx, lam(X,E), arr(Tx,Ty)) :- type([(X:Tx)|Ctx], E, Te).
+  -- type(KC, C, lam(X,E), arr(Tx,Te)) :- type(KC, [(X:Tx)|C], E, Te),
+  --                                      kind(KC, arr(Tx,Te), o).
   ( fresh $ \(x,tx,e,te) -> do{ tm `eq` lam x e
                               ; ty `eq` arr tx te
-                              ; type_ (cons (pair x tx) ctx) e te
+                              ; gs <- type_ kc (cons (pair x tx) ctx) e te
+                              ; return (L[A"kind",kc,arr tx te,star] : gs)
                               } )
 
-ex3 = tst $ fresh $ \(x,y,ty) -> do{ type_ nil (lam x $ lam y $ var y) ty; expand' ty }
+ex1 = tst $ fresh $ \(kc,ty) ->
+  do gs <- type_ kc nil (lam x $ var x) ty
+     ty_ <- expand' ty
+     conjs [V x `eq` var(A $ "_"++show x) | x <- fv ty_]
+     conjs [kind_ kctx t k | L[A"kind",kctx,t,k] <- gs]
+     (,) <$> expand' ty <*> expand' kc
+  where x = A "x"
 
-ex10 = let (a,b) = (V(-1),V(-2)) in tst $ fresh $ \kc -> do { kind_ kc (arr a b) star; kc' <- expand' kc; a' <- expand' a; b' <- expand' b; return (a',b',kc') }
+ex2 = tst $ fresh $ \(kc,ty) ->
+  do gs <- type_ kc nil (lam x $ lam y $ var x) ty;
+     ty_ <- expand' ty
+     conjs [V x `eq` var(A $ "_"++show x) | x <- fv ty_] -- concretize vars
+     conjs [kind_ kctx t k | L[A"kind",kctx,t,k] <- gs] -- run delayed goal
+     (,) <$> expand' ty <*> expand' kc
+  where (x,y) = (A"x",A"y")
+
+
+ex3 = tst $ fresh $ \(kc,ty) ->
+  do gs <- type_ kc nil (lam x $ lam y $ var y) ty;
+     ty_ <- expand' ty
+     conjs [V x `eq` var(A $ "_"++show x) | x <- fv ty_] -- concretize vars
+     conjs [kind_ kctx t k | L[A"kind",kctx,t,k] <- gs] -- run delayed goal
+     (,) <$> expand' ty <*> expand' kc
+  where (x,y) = (A"x",A"y")
+
+
+
+ex10 = let (a,b) = (V(-1),V(-2)) in tst $ fresh $ \kc -> do{ kind_ kc (arr a b) star; kc' <- expand' kc; a' <- expand' a; b' <- expand' b; return (a',b',kc') }

@@ -31,3 +31,11 @@ type_ ctx tm ty =
                               ; ty `eq` arr tx te
                               ; type_ (cons (pair x tx) ctx) e te
                               } )
+
+
+ex1 = tst $ fresh $ \ty -> do{ type_ nil (lam x $ var x) ty; expand' ty } where x = A"x"
+
+ex2 = tst $ fresh $ \ty -> do{ type_ nil (lam x $ lam y $ var x) ty; expand' ty } where (x,y) = (A"x",A"y")
+
+ex3 = tst $ fresh $ \ty -> do{ type_ nil (lam x $ lam y $ var y) ty; expand' ty } where (x,y) = (A"x",A"y")
+

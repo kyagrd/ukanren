@@ -168,6 +168,12 @@ expand' t@(A _) = return t
 expand' (L ts) = L <$> mapM expand' ts
 expand' (S ts) = S <$> mapM expand' ts
 
+fv_ (V x) = [x]
+fv_ (A _) = []
+fv_ (L ts) = concatMap fv_ ts
+fv_ (S ts) = concatMap fv_ ts
+
+fv t = usort $ fv_ t
 
 -- Finite set unification baked in but this way cannot do set union
 -- set member, etc, in a logical way. Only unification ...
@@ -201,6 +207,11 @@ eq t1 t2 = join $ e <$> expand t1 <*> expand t2
 -- implemetation of Prolog's (/==) in microKanren
 (/==) :: Term -> Term -> Goal
 a /== b = guard =<< (/=) <$> (expand a) <*> (expand b)
+
+-- implemetation of Prolog's (==) in microKanren
+(===) :: Term -> Term -> Goal
+a === b = guard =<< (==) <$> (expand a) <*> (expand b)
+
 {-
           do a' <- expand a
              b' <- expand b

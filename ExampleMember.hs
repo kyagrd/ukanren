@@ -83,8 +83,7 @@ pair x y = L [a_pair, x, y]
 first :: Term -> Term -> Term -> Goal
 first k v ctx = fresh $ \(k1,v1,ps) ->
   do { ctx `eq` cons (pair k1 v1) ps
-     ; do { k `eq` k1; v `eq` v1 }
-       <|>
+     ; do { k `eq` k1; v `eq` v1 } <|>
        do { k /== k1; first k v ps }
      }
 
