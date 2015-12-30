@@ -40,7 +40,7 @@ kind_ kc t k =
 
 
 type_ kc ctx tm ty =
-  -- type(KC, C, var(X), Ty) :- first (X:Ty) C.
+  -- type(KC, C, var(X), Ty) :- first(X:Ty, C).
   ( fresh $ \x -> do{ tm `eq` var x; first x ty ctx; return [] } )
   <|>
   -- type(KC, C, app(F,E), Ty) :- type(C, F, arr(Te,Ty)), type(C,E,Te).
@@ -61,8 +61,8 @@ type_ kc ctx tm ty =
 ex1 = tst $ fresh $ \(kc,ty) ->
   do gs <- type_ kc nil (lam x $ var x) ty
      ty_ <- expand' ty
-     conjs [V x `eq` var(A $ "_"++show x) | x <- fv ty_]
-     conjs [kind_ kctx t k | L[A"kind",kctx,t,k] <- gs]
+     conjs [V x `eq` var(A $ "_"++show x) | x <- fv ty_] -- concretize vars
+     conjs [kind_ kctx t k | L[A"kind",kctx,t,k] <- gs] -- run delayed goal
      (,) <$> expand' ty <*> expand' kc
   where x = A "x"
 

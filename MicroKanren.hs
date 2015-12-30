@@ -175,6 +175,18 @@ fv_ (S ts) = concatMap fv_ ts
 
 fv t = usort $ fv_ t
 
+copy_term t t' = do
+  te <- expand' t
+  s <- sequence [(,) <$> pure v <*> newVar | v <- fv te]
+  t' `eq` subsvar s te
+  te' <- expand' te
+  return [p | p@(_,v) <- s, v `elem` fv te'] -- exclude irrelevant subs
+  where
+  subsvar s (V n) = V $ fromMaybe n (lookup n s)
+  subsvar s t@(A _) = t
+  subsvar s (L ts) = L $ map (subsvar s) ts
+  subsvar s (S ts) = S $ map (subsvar s) ts
+
 -- Finite set unification baked in but this way cannot do set union
 -- set member, etc, in a logical way. Only unification ...
 eq :: Term -> Term -> Goal

@@ -17,16 +17,16 @@ lam x t = L [a_lam, x, t]
 arr a b = L [a_arr, a, b]
 
 type_ ctx tm ty =
-  -- type(Ctx, var(X), Ty) :- first (X:Ty) Ctx.
+  -- type(C, var(X), Ty) :- first(X:Ty, C).
   ( fresh $ \x -> do{ tm `eq` var x; first x ty ctx } )
   <|>
-  -- type(Ctx, app(F,E), Ty) :- type(Ctx, F, arr(Te,Ty)), type(Ctx,E,Te).
+  -- type(C, app(F,E), Ty) :- type(C, F, arr(Te,Ty)), type(C,E,Te).
   ( fresh $ \(f, e, te) -> do{ tm `eq` app f e;
                              ; type_ ctx f (arr te ty) 
                              ; type_ ctx e te
                              } )
   <|>
-  -- type(Ctx, lam(X,E), arr(Tx,Ty)) :- type([(X:Tx)|Ctx], E, Te).
+  -- type(C, lam(X,E), arr(Tx,Ty)) :- type([(X:Tx)|C], E, Te).
   ( fresh $ \(x,tx,e,te) -> do{ tm `eq` lam x e
                               ; ty `eq` arr tx te
                               ; type_ (cons (pair x tx) ctx) e te
