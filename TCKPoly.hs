@@ -100,46 +100,32 @@ type_ kc ctx tm ty =
         ; return $ gs1++gs2
         } )
 
+------------------------
+
+type__ kc ctx tm ty = do
+  gs <- type_ kc ctx tm ty
+  ty_ <- expand' ty
+  gs_ <- mapM expand' gs
+  let vs = usort [x | x <-concatMap fv (ty_:[ty | L[_,_,ty,_]<- gs_])]
+  conjs [V x `eq` var(A $ "_"++show x) | x <- vs]
+  xks <- sequence [(,) <$> pure x <*> newVar | x <- vs]
+  let monokc = [pair (A $ "_"++show x) (mono (V k)) | (x,k) <- xks]
+  gs_ <- mapM expand' gs
+  conjs [kind_ (foldr cons kctx monokc) t k | L[A"kind",kctx,t,k] <- gs_]
+
 ex1 = tst $ fresh $ \(kc,ty) ->
-  do gs <- type_ kc nil (lam x $ var x) ty
-     ty_ <- expand' ty
-     gs_ <- mapM expand' gs
-     let gstys = [ty | L[_,_,ty,_]<- gs_]
-     let vs = [x | x <-concatMap fv (ty_:gstys)]
-     conjs [V x `eq` var(A $ "_"++show x) | x <- vs]
-     xks <- sequence [(,) <$> pure x <*> newVar | x <- vs]
-     let monokc = [pair (A $ "_"++show x) (mono (V k)) | (x,k) <- xks]
-     gs_ <- mapM expand' gs
-     conjs [kind_ (foldr cons kctx monokc) t k | L[A"kind",kctx,t,k] <- gs_]
+  do type__ kc nil (lam x $ var x) ty
      (,) <$> expand' ty <*> expand' kc
   where x = A "x"
 
 ex2 = tst $ fresh $ \(kc,ty) ->
-  do gs <- type_ kc nil (lam x $ lam y $ var x) ty;
-     ty_ <- expand' ty
-     gs_ <- mapM expand' gs
-     let gstys = [ty | L[_,_,ty,_]<- gs_]
-     let vs = [x | x <-concatMap fv (ty_:gstys)]
-     conjs [V x `eq` var(A $ "_"++show x) | x <- vs]
-     xks <- sequence [(,) <$> pure x <*> newVar | x <- vs]
-     let monokc = [pair (A $ "_"++show x) (mono (V k)) | (x,k) <- xks]
-     gs_ <- mapM expand' gs
-     conjs [kind_ (foldr cons kctx monokc) t k | L[A"kind",kctx,t,k] <- gs_]
+  do type__ kc nil (lam x $ lam y $ var x) ty
      (,) <$> expand' ty <*> expand' kc
   where (x,y) = (A"x",A"y")
 
 
 ex3 = tst $ fresh $ \(kc,ty) ->
-  do gs <- type_ kc nil (lam x $ lam y $ var y) ty;
-     ty_ <- expand' ty
-     gs_ <- mapM expand' gs
-     let gstys = [ty | L[_,_,ty,_]<- gs_]
-     let vs = [x | x <-concatMap fv (ty_:gstys)]
-     conjs [V x `eq` var(A $ "_"++show x) | x <- vs]
-     xks <- sequence [(,) <$> pure x <*> newVar | x <- vs]
-     let monokc = [pair (A $ "_"++show x) (mono (V k)) | (x,k) <- xks]
-     gs_ <- mapM expand' gs
-     conjs [kind_ (foldr cons kctx monokc) t k | L[A"kind",kctx,t,k] <- gs_]
+  do type__ kc nil (lam x $ lam y $ var y) ty
      (,) <$> expand' ty <*> expand' kc
   where (x,y) = (A"x",A"y")
 
