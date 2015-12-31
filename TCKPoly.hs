@@ -111,7 +111,9 @@ type__ kc ctx tm ty = do
   xks <- sequence [(,) <$> pure x <*> newVar | x <- vs]
   let monokc = [pair (A $ "_"++show x) (mono (V k)) | (x,k) <- xks]
   gs_ <- mapM expand' gs
-  conjs [kind_ (foldr cons kctx monokc) t k | L[A"kind",kctx,t,k] <- gs_]
+  conjs [ fresh $ \kc0 -> do kctx `eq` (foldr cons kc0 monokc)
+                             kind_ kctx t k
+        | L[A"kind",kctx,t,k] <- gs_]
 
 ex1 = tst $ fresh $ \(kc,ty) ->
   do type__ kc nil (lam x $ var x) ty

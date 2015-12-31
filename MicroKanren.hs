@@ -161,9 +161,7 @@ expand t = return t
 -- expands variables inside L and S
 expand' :: Term -> K Term
 expand' t@(V _) = do t' <- expand t
-                     case t' of
-                       V _ -> return t'
-                       _ -> expand' t'
+                     if t==t' then return t' else expand' t'
 expand' t@(A _) = return t
 expand' (L ts) = L <$> mapM expand' ts
 expand' (S ts) = S <$> mapM expand' ts

@@ -103,7 +103,9 @@ type__ kc ctx tm ty = do
   xks <- sequence [(,) <$> pure x <*> newVar | x <- vs]
   let kclist = [pair (A $ "_"++show x) (V k) | (x,k) <- xks]
   gs_ <- mapM expand' gs
-  conjs [kind_ (foldr cons kctx kclist) t k | L[A"kind",kctx,t,k] <- gs_]
+  conjs [ fresh $ \kc0 -> do kctx `eq` (foldr cons kc0 kclist)
+                             kind_ kctx t k
+        | L[A"kind",kctx,t,k] <- gs_]
 
 ex1 = tst $ fresh $ \(kc,ty) ->
   do type__ kc nil (lam x $ var x) ty
@@ -117,7 +119,7 @@ ex2 = tst $ fresh $ \(kc,ty) ->
 
 
 ex3 = tst $ fresh $ \(kc,ty) ->
-  do gs <- type_ kc nil (lam x $ lam y $ var y) ty
+  do gs <- type__ kc nil (lam x $ lam y $ var y) ty
      (,) <$> expand' ty <*> expand' kc
   where (x,y) = (A"x",A"y")
 
