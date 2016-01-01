@@ -40,14 +40,16 @@ instKi ksch k =
 instTy kc tsch t =
   do { tsch `eq` mono t; return [] }
   <|>
-  ( fresh $ \(c,t1) -> do { tsch `eq` poly c t1
-                          ; s <- copy_term (poly c t1) (poly c t)
-                          ; ks <- sequence [newVar | _ <- s]
-                          ; return $ concat -- new tyvars must be the same kind
-                              [ [ L[A"kind",kc,V v1,V k]   -- kind(kc,v1,k)
-                                , L[A"kind",kc,V v2,V k] ] -- kind(kc,v2,k)
-                              | ((v1,v2),k) <- zip s ks, v1/=v2 ]
-                          }
+  ( fresh $ \(c,t1,t2) ->
+      do { tsch `eq` poly c t1
+         ; s <- copy_term (poly c t1) (poly c t2)
+         ; ks <- sequence [newVar | _ <- s]
+         ; t `eq` t2 -- do this later here because t may not be var
+         ; return $ concat -- new tyvars must be of the same kind
+             [ [ L[A"kind",kc,V v1,V k]   -- kind(kc,v1,k)
+               , L[A"kind",kc,V v2,V k] ] -- kind(kc,v2,k)
+             | ((v1,v2),k) <- zip s ks, v1/=v2 ]
+         }
   )
 
 kind_ kc t k =
