@@ -46,7 +46,7 @@ instTy kc tsch t =
                           ; return $ concat -- new tyvars must be the same kind
                               [ [ L[A"kind",kc,V v1,V k]   -- kind(kc,v1,k)
                                 , L[A"kind",kc,V v2,V k] ] -- kind(kc,v2,k)
-                              | ((v1,v2),k) <- zip s ks ]
+                              | ((v1,v2),k) <- zip s ks, v1/=v2 ]
                           }
   )
 
