@@ -88,9 +88,73 @@ first k v ctx = fresh $ \(k1,v1,ps) ->
      }
 
 
-subset_of :: Term -> Term -> Goal
-subset_of s1 s2 = fresh $ \(x,xs) -> 
-  eq s1 nil <|> do { eq s1 (cons x xs); memb x s2; subset_of xs s2 }
 
+
+-----------------------------------------------------------
+
+-- for building list terms
+snil :: Term
+snil = a_snil
+scons :: Term -> Term -> Term
+scons x xs = L [a_scons, x, xs]
+
+a_snil = A "{}"
+a_scons = A "{|}"
+
+smemb :: Term -> Term -> Goal
+smemb a s = fresh $ \(x,xs) -> eq s (scons a xs) <|>
+                           do{ eq s (scons x xs); a /== x; smemb a xs }
+
+
+-- finite subset
+subset_of :: Term -> Term -> Goal
+subset_of s1 s2 = fresh $ \(x,xs) ->
+  eq s1 snil <|> do { s1 `eq` scons x xs; smemb x s2; subset_of xs s2 }
+
+-- finite set unificaiton
 sunify :: Term -> Term -> Goal
 sunify s1 s2 = do { subset_of s1 s2; subset_of s2 s1 }
+
+-- appending sets as lists
+sapp :: Term -> Term -> Term -> Goal
+sapp xs ys zs =
+  do { xs `eq` snil; ys `eq` zs }
+  <|>
+  ( fresh $ \(x,ts,us) ->
+      do { xs `eq` scons x ts; zs `eq` scons x us; sapp ts ys us } )
+
+
+-- naive implementation
+osunify :: Term -> Term -> Goal
+osunify s1 s2 = do
+  s1e <- expand' s1
+  s2e <- expand' s2
+  case (s1,s2) of
+    (V _, _) -> s1e `eq` s2e
+    (_, V _) -> s1e `eq` s2e
+    _ -> fresh $ \(xs,t1,ys,t2) ->
+      do { split_heads s1e (xs,t1)
+         ; split_heads s2e (ys,t2)
+         ; osu (xs,t1) (ys,t2)
+         }
+
+split_heads s (xs,t) = -- we know that s is not variable
+  do { s `eq` snil; xs `eq` snil; t `eq` snil }
+  <|>
+  ( fresh $ \(y,ys) ->
+      do { s `eq` scons y ys
+         ; ys_ <- expand ys
+         ; case ys_ of
+             V _ -> do { xs `eq` scons y snil; t `eq` ys }
+             _   -> fresh $ \hs ->
+                    do { xs `eq` scons y hs; split_heads ys (hs,t) }
+         } )
+
+osu (xs,t1) (ys,t2) = do
+  t1e <- expand' t1
+  t2e <- expand' t2
+  if t1e==snil && t2e==snil then sunify xs ys
+  else if t1e==snil then do { subset_of ys xs; t2 `eq` xs }
+  else if t2e==snil then do { subset_of xs ys; t1 `eq` ys }
+  else fresh $ \(zs,t) -> do { sapp xs ys zs; sapp zs t t1; sapp zs t t2 }
+

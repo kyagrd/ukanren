@@ -194,6 +194,7 @@ eq t1 t2 = join $ e <$> expand t1 <*> expand t2
       e (V x) t = assign x t
       e t (V x) = assign x t
       e (A x) (A y) | (x == y) = ok
+      -- e (L [a_scons,x,xs]) (L [a_scons,y,ys]) =
       e (L xs) (L ys) | length xs == length ys = zipWithM_ eq xs ys
       -- hack to make ex10 and ex10' stop looping instead of calling
       -- eq inside in_ function but is this really ok? Maybe having
