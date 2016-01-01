@@ -33,14 +33,16 @@ star = L [a_o]
 instTy kc tsch t =
   do { tsch `eq` mono t; return [] }
   <|>
-  ( fresh $ \(c,t1) -> do { tsch `eq` poly c t1
-                          ; s <- copy_term (poly c t1) (poly c t)
-                          ; ks <- sequence [newVar | _ <- s]
-                          ; return $ concat -- new tyvars must be the same kind
-                                   [ [ L[A"kind",kc,V v1,V k]
-                                     , L[A"kind",kc,V v2,V k] ]
-                                   | ((v1,v2),k) <- zip s ks ]
-                          }
+  ( fresh $ \(c,t1,t2) ->
+      do { tsch `eq` poly c t1
+         ; s <- copy_term (poly c t1) (poly c t2)
+         ; ks <- sequence [newVar | _ <- s]
+         ; t `eq` t2 -- do this later here because t may not be var
+         ; return $ concat -- new tyvars must be the same kind
+                  [ [ L[A"kind",kc,V v1,V k]
+                    , L[A"kind",kc,V v2,V k] ]
+                  | ((v1,v2),k) <- zip s ks, v1/=v2 ]
+         }
   )
 
 kind_ kc t k =
@@ -102,10 +104,11 @@ type__ kc ctx tm ty = do
   conjs [V x `eq` var(A $ "_"++show x) | x <- vs]
   xks <- sequence [(,) <$> pure x <*> newVar | x <- vs]
   let kclist = [pair (A $ "_"++show x) (V k) | (x,k) <- xks]
+  kc0 <- V <$> newVar
+  kc `eq` foldr cons kc0 kclist
   gs_ <- mapM expand' gs
-  conjs [ fresh $ \kc0 -> do kctx `eq` (foldr cons kc0 kclist)
-                             kind_ kctx t k
-        | L[A"kind",kctx,t,k] <- gs_]
+  conjs [ kind_ kctx t k | L[A"kind",kctx,t,k] <- gs_]
+
 
 ex1 = tst $ fresh $ \(kc,ty) ->
   do type__ kc nil (lam x $ var x) ty

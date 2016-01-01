@@ -46,9 +46,9 @@ instTy kc tsch t =
          ; ks <- sequence [newVar | _ <- s]
          ; t `eq` t2 -- do this later here because t may not be var
          ; return $ concat -- new tyvars must be of the same kind
-             [ [ L[A"kind",kc,V v1,V k]   -- kind(kc,v1,k)
-               , L[A"kind",kc,V v2,V k] ] -- kind(kc,v2,k)
-             | ((v1,v2),k) <- zip s ks, v1/=v2 ]
+                  [ [ L[A"kind",kc,V v1,V k]   -- kind(kc,v1,k)
+                    , L[A"kind",kc,V v2,V k] ] -- kind(kc,v2,k)
+                  | ((v1,v2),k) <- zip s ks, v1/=v2 ]
          }
   )
 
@@ -112,10 +112,10 @@ type__ kc ctx tm ty = do
   conjs [V x `eq` var(A $ "_"++show x) | x <- vs]
   xks <- sequence [(,) <$> pure x <*> newVar | x <- vs]
   let monokc = [pair (A $ "_"++show x) (mono (V k)) | (x,k) <- xks]
+  kc0 <- V <$> newVar
+  kc `eq` foldr cons kc0 monokc
   gs_ <- mapM expand' gs
-  conjs [ fresh $ \kc0 -> do kctx `eq` (foldr cons kc0 monokc)
-                             kind_ kctx t k
-        | L[A"kind",kctx,t,k] <- gs_]
+  conjs [ kind_ kctx t k | L[A"kind",kctx,t,k] <- gs_]
 
 ex1 = tst $ fresh $ \(kc,ty) ->
   do type__ kc nil (lam x $ var x) ty
