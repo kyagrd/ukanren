@@ -129,7 +129,7 @@ osunify :: Term -> Term -> Goal
 osunify s1 s2 = do
   s1e <- expand' s1
   s2e <- expand' s2
-  case (s1,s2) of
+  case (s1e,s2e) of
     (V _, _) -> s1e `eq` s2e
     (_, V _) -> s1e `eq` s2e
     _ -> fresh $ \(xs,t1,ys,t2) ->
