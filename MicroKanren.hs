@@ -189,45 +189,37 @@ copy_term t t' = do
 -- set member, etc, in a logical way. Only unification ...
 eq :: Term -> Term -> Goal
 eq t1 t2 = join $ e <$> expand t1 <*> expand t2
-    where
-      e (V x) (V y) | x == y = ok
-      e (V x) t = assign x t
-      e t (V x) = assign x t
-      e (A x) (A y) | (x == y) = ok
-      -- e (L [a_scons,x,xs]) (L [a_scons,y,ys]) =
-      e (L xs) (L ys) | length xs == length ys = zipWithM_ eq xs ys
-      -- hack to make ex10 and ex10' stop looping instead of calling
-      -- eq inside in_ function but is this really ok? Maybe having
-      -- an occurs check by default might be the right way?
-      e (S xs) (S ys) = do xs' <- usort <$> mapM expand xs
-                           ys' <- usort <$> mapM expand ys
-                           conjs $ interleave [x `in_` ys'|x<-xs']
-                                              [y `in_` xs'|y<-ys']
-      e _ _ = mzero
-      -- hard-wired implemention of memb inside Kanren unification
-      in_ t (z:zs) = e t z <|> do{ t/==z; in_ t zs } 
-      in_ t [] = mzero
-{-
-      e (S xs) (S ys) = conjs $ interleave [x `in_` ys'|x<-xs']
-                                           [y `in_` xs'|y<-ys']
-                      where xs' = usort xs
-                            ys' = usort ys
-      e _ _ = mzero
--}
+  where
+  e (V x) (V y) | x == y = ok
+  e (V x) t = assign x t
+  e t (V x) = assign x t
+  e (A x) (A y) | (x == y) = ok
+  -- e (L [scons1,x,xs]) (L [scons2,y,ys])
+  --   | scons1==a_scons && scons2==a_scons =
+  e (L xs) (L ys) | length xs == length ys = zipWithM_ eq xs ys
+  -- hack to make ex10 and ex10' stop looping instead of calling
+  -- eq inside in_ function but is this really ok? Maybe having
+  -- an occurs check by default might be the right way?
+  e (S xs) (S ys) = do xs' <- usort <$> mapM expand xs
+                       ys' <- usort <$> mapM expand ys
+                       conjs $ interleave [x `in_` ys'|x<-xs']
+                                          [y `in_` xs'|y<-ys']
+  e _ _ = mzero
 
--- implemetation of Prolog's (/==) in microKanren
+  -- hard-wired implemention of memb inside Kanren unification
+  in_ t (z:zs) = e t z <|> do{ t/==z; in_ t zs } 
+  in_ t [] = mzero
+
+
+-- implemetation of Prolog's (/==)
 (/==) :: Term -> Term -> Goal
 a /== b = guard =<< (/=) <$> (expand a) <*> (expand b)
 
--- implemetation of Prolog's (==) in microKanren
+-- implemetation of Prolog's (==)
 (===) :: Term -> Term -> Goal
 a === b = guard =<< (==) <$> (expand a) <*> (expand b)
 
-{-
-          do a' <- expand a
-             b' <- expand b
-             guard (a' /= b')
--}  
+
 
 disj, conj :: Goal -> Goal -> Goal
 disj = (<|>)
@@ -292,4 +284,5 @@ tst t = mapM_ print $ test t
 *MicroKanren> tst (fresh $ \(x,y) -> do{x `eq` A"a";S [y,x] `eq` S [x,y];y `eq` A"b"})
 ((),(2,fromList [(0,A "a"),(1,A "b")]))
 -}
+
 
