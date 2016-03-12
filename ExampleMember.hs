@@ -21,15 +21,15 @@ a_cons = A "cons"
 -- member(A,[X|Xs]) :- member(A,Xs).
 --
 member :: Term -> Term -> Goal
-member a s = fresh $ \(x,xs) -> eq s (cons a xs) <|>
-                            do{ eq s (cons x xs); member a xs }
+member a s = fresh_ $ \(x,xs) -> eq s (cons a xs) <|>
+                             do{ eq s (cons x xs); member a xs }
 {-
 *ExampleMember> :m + MicroKanren
 
 *ExampleMember MicroKanren> tst (A"a" `member` cons (A"a") nil)
 ((),(2,fromList [(1,A "nil")]))
 
-*ExampleMember MicroKanren> tst (fresh $ \xs -> A"a" `member` cons (A"a") xs)
+*ExampleMember MicroKanren> tst (fresh_ $ \xs -> A"a" `member` cons (A"a") xs)
 ((),(3,fromList [(0,V 2)]))
 ((),(5,fromList [(0,V 2),(1,A "a"),(2,L [A "cons",A "a",V 4])]))
 ((),(7,fromList [(0,V 2),(1,A "a"),(2,L [A "cons",V 3,V 4]),(4,L [A "cons",A "a",V 6])]))
@@ -41,7 +41,7 @@ member a s = fresh $ \(x,xs) -> eq s (cons a xs) <|>
 ((),(19,fromList [(0,V 2),(1,A "a"),(2,L [A "cons",V 3,V 4]),(4,L [A "cons",V 5,V 6]),(6,L [A "cons",V 7,V 8]),(8,L [A "cons",V 9,V 10]),(10,L [A "cons",V 11,V 12]),(12,L [A "cons",V 13,V 14]),(14,L [A "cons",V 15,V 16]),(16,L [A "cons",A "a",V 18])]))
 ((),(21,fromList [(0,V 2),(1,A "a"),(2,L [A "cons",V 3,V 4]),(4,L [A "cons",V 5,V 6]),(6,L [A "cons",V 7,V 8]),(8,L [A "cons",V 9,V 10]),(10,L [A "cons",V 11,V 12]),(12,L [A "cons",V 13,V 14]),(14,L [A "cons",V 15,V 16]),(16,L [A "cons",V 17,V 18]),(18,L [A "cons",A "a",V 20])]))
 
-*ExampleMember MicroKanren> tst (fresh $ \(x,xs) -> A"a" `member` cons x xs)
+*ExampleMember MicroKanren> tst (fresh_ $ \(x,xs) -> A"a" `member` cons x xs)
 ((),(4,fromList [(0,A "a"),(1,V 3)]))
 ((),(6,fromList [(0,V 2),(1,V 3),(3,L [A "cons",A "a",V 5])]))
 ((),(8,fromList [(0,V 2),(1,V 3),(3,L [A "cons",V 4,V 5]),(5,L [A "cons",A "a",V 7])]))
@@ -59,7 +59,7 @@ member a s = fresh $ \(x,xs) -> eq s (cons a xs) <|>
 -- in order/number of nfresh variable generation. Cannot prove it
 -- but I think membr and member are eqivalent modulo fresh variables.
 membr :: Term -> Term -> Goal
-membr a s = fresh $ \(x,xs) -> eq s (cons x xs) >> (eq a x <|> membr a xs)
+membr a s = fresh_ $ \(x,xs) -> eq s (cons x xs) >> (eq a x <|> membr a xs)
 
 
 -- list membrership with guarded by (/==) in Prolog.
@@ -70,10 +70,10 @@ membr a s = fresh $ \(x,xs) -> eq s (cons x xs) >> (eq a x <|> membr a xs)
 -- memb(A,[X|Xs]) :- A /== X, memb(A,Xs).
 --
 memb :: Term -> Term -> Goal
-memb a s = fresh $ \(x,xs) -> eq s (cons a xs) <|>
+memb a s = fresh_ $ \(x,xs) -> eq s (cons a xs) <|>
                           do{ eq s (cons x xs); a /== x; memb a xs }
 {-
-*ExampleMember MicroKanren> tst (fresh $ \(x,xs) -> x `memb` cons x xs)
+*ExampleMember MicroKanren> tst (fresh_ $ \(x,xs) -> x `memb` cons x xs)
 ((),(4,fromList [(1,V 3)]))
  -}
 
@@ -81,7 +81,7 @@ a_pair = A "pair"
 pair x y = L [a_pair, x, y] 
 
 first :: Term -> Term -> Term -> Goal
-first k v ctx = fresh $ \(k1,v1,ps) ->
+first k v ctx = fresh_ $ \(k1,v1,ps) ->
   do { ctx `eq` cons (pair k1 v1) ps
      ; do { k `eq` k1; v `eq` v1 } <|>
        do { k /== k1; first k v ps }
@@ -102,13 +102,13 @@ a_snil = A "{}"
 a_scons = A "{|}"
 
 smemb :: Term -> Term -> Goal
-smemb a s = fresh $ \(x,xs) -> eq s (scons a xs) <|>
+smemb a s = fresh_ $ \(x,xs) -> eq s (scons a xs) <|>
                            do{ eq s (scons x xs); a /== x; smemb a xs }
 
 
 -- finite subset
 subset_of :: Term -> Term -> Goal
-subset_of s1 s2 = fresh $ \(x,xs) ->
+subset_of s1 s2 = fresh_ $ \(x,xs) ->
   eq s1 snil <|> do { s1 `eq` scons x xs; smemb x s2; subset_of xs s2 }
 
 -- finite set unificaiton
@@ -120,7 +120,7 @@ sapp :: Term -> Term -> Term -> Goal
 sapp xs ys zs =
   do { xs `eq` snil; ys `eq` zs }
   <|>
-  ( fresh $ \(x,ts,us) ->
+  ( fresh_ $ \(x,ts,us) ->
       do { xs `eq` scons x ts; zs `eq` scons x us; sapp ts ys us } )
 
 
@@ -132,7 +132,7 @@ osunify s1 s2 = do
   case (s1e,s2e) of
     (V _, _) -> s1e `eq` s2e
     (_, V _) -> s1e `eq` s2e
-    _ -> fresh $ \(xs,t1,ys,t2) ->
+    _ -> fresh_ $ \(xs,t1,ys,t2) ->
       do { split_heads s1e (xs,t1)
          ; split_heads s2e (ys,t2)
          ; osu (xs,t1) (ys,t2)
@@ -141,12 +141,12 @@ osunify s1 s2 = do
 split_heads s (xs,t) = -- we know that s is not variable
   do { s `eq` snil; xs `eq` snil; t `eq` snil }
   <|>
-  ( fresh $ \(y,ys) ->
+  ( fresh_ $ \(y,ys) ->
       do { s `eq` scons y ys
          ; ys_ <- expand ys
          ; case ys_ of
              V _ -> do { xs `eq` scons y snil; t `eq` ys }
-             _   -> fresh $ \hs ->
+             _   -> fresh_ $ \hs ->
                     do { xs `eq` scons y hs; split_heads ys (hs,t) }
          } )
 
@@ -156,5 +156,5 @@ osu (xs,t1) (ys,t2) = do
   if t1e==snil && t2e==snil then sunify xs ys
   else if t1e==snil then do { subset_of ys xs; t2 `eq` xs }
   else if t2e==snil then do { subset_of xs ys; t1 `eq` ys }
-  else fresh $ \(zs,t) -> do { sapp xs ys zs; sapp zs t t1; sapp zs t t2 }
+  else fresh_ $ \(zs,t) -> do { sapp xs ys zs; sapp zs t t1; sapp zs t t2 }
 

@@ -18,24 +18,24 @@ arr a b = L [a_arr, a, b]
 
 type_ ctx tm ty =
   -- type(C, var(X), Ty) :- first(X:Ty, C).
-  ( fresh $ \x -> do{ tm `eq` var x; first x ty ctx } )
+  ( fresh_ $ \x -> do{ tm `eq` var x; first x ty ctx } )
   <|>
   -- type(C, app(F,E), Ty) :- type(C, F, arr(Te,Ty)), type(C,E,Te).
-  ( fresh $ \(f, e, te) -> do{ tm `eq` app f e;
+  ( fresh_ $ \(f, e, te) -> do{ tm `eq` app f e;
                              ; type_ ctx f (arr te ty) 
                              ; type_ ctx e te
                              } )
   <|>
   -- type(C, lam(X,E), arr(Tx,Ty)) :- type([(X:Tx)|C], E, Te).
-  ( fresh $ \(x,tx,e,te) -> do{ tm `eq` lam x e
+  ( fresh_ $ \(x,tx,e,te) -> do{ tm `eq` lam x e
                               ; ty `eq` arr tx te
                               ; type_ (cons (pair x tx) ctx) e te
                               } )
 
 
-ex1 = tst $ fresh $ \ty -> do{ type_ nil (lam x $ var x) ty; expand' ty } where x = A"x"
+ex1 = tst $ fresh_ $ \ty -> do{ type_ nil (lam x $ var x) ty; expand' ty } where x = A"x"
 
-ex2 = tst $ fresh $ \ty -> do{ type_ nil (lam x $ lam y $ var x) ty; expand' ty } where (x,y) = (A"x",A"y")
+ex2 = tst $ fresh_ $ \ty -> do{ type_ nil (lam x $ lam y $ var x) ty; expand' ty } where (x,y) = (A"x",A"y")
 
-ex3 = tst $ fresh $ \ty -> do{ type_ nil (lam x $ lam y $ var y) ty; expand' ty } where (x,y) = (A"x",A"y")
+ex3 = tst $ fresh_ $ \ty -> do{ type_ nil (lam x $ lam y $ var y) ty; expand' ty } where (x,y) = (A"x",A"y")
 

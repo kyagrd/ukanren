@@ -11,51 +11,18 @@ import Data.Maybe (fromMaybe)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
 
-type Var = Int
+data Var = Var { varid::VarId, attr::Attr } deriving (Show, Eq, Ord)
+
+type VarId = Int
+type Attr = String
 
 type Atom = String
--- data Atom = Int Int
---        deriving (Show, Eq, Ord)
+-- newtype Atom = Int Int deriving (Show, Eq, Ord)
 
 data Term = V Var
           | A Atom
           | L [Term]
-          | S [Term]
-            deriving (Show)
-
-
--- there may be a generic programming solution to these Eq and Ord instances
-
-instance Eq Term where
-  V x  == V y  = x==y
-  A a  == A b  = a==b
-  L ts == L us = and $ zipWith (==) ts us
-  S ts == S us = usort ts == usort us
-  _    == _    = False
-
-instance Ord Term where
-   V x  <= V y  = x <= y
-   V _  <= _    = True
-   A _  <= V _  = False
-   A a  <= A b  = a <= b
-   A _  <= _    = True
-   L _  <= V _  = False
-   L _  <= A _  = False
-   L ts <= L us = ts <= us
-   L _  <= _    = True
-   S ts <= S us = usort ts <= usort us
-   S _  <= _    = False
-
-   V x  < V y  = x < y
-   V _  < _    = True
-   A a  < A b  = a < b
-   A _  < _    = True
-   L _  < V _  = False
-   L _  < A _  = False
-   L ts < L us = ts < us
-   L _  < _    = True
-   S ts < S us = usort ts < usort us
-   S _  < _    = False
+            deriving (Show,Eq,Ord)
 
 
 usort xs = uniq $ sort xs
@@ -66,13 +33,13 @@ uniq (x:y:xs) | x == y    = uniq (y:xs)
               | otherwise = x : uniq (y:xs)
 
 type Subst = IntMap Term
-type State = (Var, Subst)
+type State = (VarId, Subst)
 
 --  A monad that can generate, bind, and look-up variables.
 class Monad m => VarGen m where
-    newVar :: m Var
-    assign :: Var -> Term -> m ()
-    deref :: Var -> m (Maybe Term)
+    newVar :: Attr -> m Var
+    assign :: VarId -> Term -> m ()
+    deref :: VarId -> m (Maybe Term)
 
 -- Fair interleaving of finitely many lists.
 interleaves :: [[a]] -> [a]
@@ -129,7 +96,7 @@ type K = StateT State Tree
 type Goal = K ()
 
 instance Monad m => VarGen (StateT State m) where
-    newVar = state (\(v,s) -> (v, (v+1, s)))
+    newVar a = state (\(v,s) -> (Var v a, (v+1, s)))
     assign v t = modify (fmap (IM.insert v t))
     deref v = gets (\(_,sub) -> IM.lookup v sub)
 
@@ -152,9 +119,10 @@ execK k st = map snd (runK k st)
 ok :: Goal
 ok = pure ()
 
+
 -- expands variables at the top level until no change
 expand :: Term -> K Term
-expand t@(V v) = do t' <- fromMaybe t <$> deref v
+expand t@(V v) = do t' <- fromMaybe t <$> deref (varid v)
                     if t' == t then return t else expand t'
 expand t = return t
 
@@ -164,18 +132,16 @@ expand' t@(V _) = do t' <- expand t
                      if t==t' then return t' else expand' t'
 expand' t@(A _) = return t
 expand' (L ts) = L <$> mapM expand' ts
-expand' (S ts) = S <$> mapM expand' ts
 
 fv_ (V x) = [x]
 fv_ (A _) = []
 fv_ (L ts) = concatMap fv_ ts
-fv_ (S ts) = concatMap fv_ ts
 
 fv t = usort $ fv_ t
 
 copy_term t t' = do
   te <- expand' t
-  s <- sequence [(,) <$> pure v <*> newVar | v <- fv te]
+  s <- sequence [(,) <$> pure v <*> newVar a | v@(Var _ a) <- fv te]
   t' `eq` subsvar s te
   te' <- expand' te
   return [p | p@(_,v) <- s, v `elem` fv te'] -- exclude irrelevant subs
@@ -183,27 +149,18 @@ copy_term t t' = do
   subsvar s (V n) = V $ fromMaybe n (lookup n s)
   subsvar s t@(A _) = t
   subsvar s (L ts) = L $ map (subsvar s) ts
-  subsvar s (S ts) = S $ map (subsvar s) ts
 
--- Finite set unification baked in but this way cannot do set union
--- set member, etc, in a logical way. Only unification ...
-eq :: Term -> Term -> Goal
-eq t1 t2 = join $ e <$> expand t1 <*> expand t2
+
+eq = eq_ (const True)
+
+eq_ :: (Attr -> Bool) -> Term -> Term -> Goal
+eq_ pa t1 t2 = join $ e <$> expand t1 <*> expand t2
   where
   e (V x) (V y) | x == y = ok
-  e (V x) t = assign x t
-  e t (V x) = assign x t
+  e (V x) t | pa(attr x) = assign (varid x) t
+  e t (V x) | pa(attr x) = assign (varid x) t
   e (A x) (A y) | (x == y) = ok
-  -- e (L [scons1,x,xs]) (L [scons2,y,ys])
-  --   | scons1==a_scons && scons2==a_scons =
   e (L xs) (L ys) | length xs == length ys = zipWithM_ eq xs ys
-  -- hack to make ex10 and ex10' stop looping instead of calling
-  -- eq inside in_ function but is this really ok? Maybe having
-  -- an occurs check by default might be the right way?
-  e (S xs) (S ys) = do xs' <- usort <$> mapM expand xs
-                       ys' <- usort <$> mapM expand ys
-                       conjs $ interleave [x `in_` ys'|x<-xs']
-                                          [y `in_` xs'|y<-ys']
   e _ _ = mzero
 
   -- hard-wired implemention of memb inside Kanren unification
@@ -232,57 +189,42 @@ conjs = sequence_
 
 
 -- Convenience function: fresh
-class Fresh a where fresh :: (a -> K b) -> K b
-instance Fresh Var where fresh f = newVar >>= f
-instance Fresh Term where fresh f = fresh (f . V)
+class Fresh a where fresh :: Attr -> (a -> K b) -> K b
+instance Fresh Var where fresh att f = newVar att >>= f
+instance Fresh Term where fresh att f = fresh att (f . V)
 instance (Fresh a, Fresh b) => Fresh (a,b) where
-    fresh f = fresh (\a -> fresh (\b -> f (a,b)))
+    fresh att f = fresh att (\a -> fresh att (\b -> f (a,b)))
 instance (Fresh a, Fresh b, Fresh c) => Fresh (a,b,c) where
-    fresh f = fresh (\a -> fresh (\(b,c) -> f (a,b,c)))
+    fresh att f = fresh att (\a -> fresh att (\(b,c) -> f (a,b,c)))
 instance (Fresh a, Fresh b, Fresh c, Fresh d) => Fresh (a,b,c,d) where
-    fresh f = fresh (\(a,b) -> fresh (\(c,d) -> f (a,b,c,d)))
+    fresh att f = fresh att (\(a,b) -> fresh att (\(c,d) -> f (a,b,c,d)))
 instance (Fresh a, Fresh b, Fresh c, Fresh d, Fresh e) => Fresh (a,b,c,d,e) where
-    fresh f = fresh (\(a,b,c) -> fresh (\(d,e) -> f (a,b,c,d,e)))
+    fresh att f = fresh att (\(a,b,c) -> fresh att (\(d,e) -> f (a,b,c,d,e)))
 
 
+fresh_ f = fresh "" f
 -- Test cases
 five :: Goal
-five = fresh $ \x -> eq x (A "5")
+five = fresh_ $ \x -> eq x (A "5")
 
 fives :: Goal
-fives = fresh fives_
+fives = fresh_ fives_
 -- where
 fives_ x = eq x (A "5") <|> fives_ x
 
 fivesR :: Goal
-fivesR = fresh fivesR_
+fivesR = fresh_ fivesR_
 -- where
 fivesR_ x = fivesR_ x <|> eq x (A "5")
 
 aAndB :: Goal
-aAndB = do fresh $ \a -> eq a (A "7")
-           fresh $ \b -> eq b (A "5") <|> eq b (A "6")
+aAndB = do fresh_ $ \a -> eq a (A "7")
+           fresh_ $ \b -> eq b (A "5") <|> eq b (A "6")
 
 
 
 test t = take 10 $ runK t start
 
 tst t = mapM_ print $ test t
-
-
----------------------------------------------------------------
-
-{- finite set unification
-*MicroKanren> tst (fresh $ \(x,y) -> do{S [y,x] `eq` S [x,y]})
-((),(2,fromList [(1,V 0)]))
-((),(2,fromList [(0,V 1)]))
-((),(2,fromList []))
-*MicroKanren> tst (fresh $ \(x,y) -> do{x `eq` A"a";S [y,x] `eq` S [x,y]})
-((),(2,fromList [(0,A "a"),(1,A "a")]))
-((),(2,fromList [(0,A "a"),(1,A "a")]))
-((),(2,fromList [(0,A "a")]))
-*MicroKanren> tst (fresh $ \(x,y) -> do{x `eq` A"a";S [y,x] `eq` S [x,y];y `eq` A"b"})
-((),(2,fromList [(0,A "a"),(1,A "b")]))
--}
 
 
