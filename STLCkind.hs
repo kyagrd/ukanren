@@ -1,10 +1,14 @@
 -- vim: ts=2: sw=2: expandtab: ai:
+{-# LANGUAGE FlexibleInstances #-}
 
-import MicroKanren
+import MicroKanren hiding (fresh, fresh_)
+import qualified MicroKanren (fresh_)
 import ExampleMember
 
 import Control.Applicative
 import Control.Monad
+
+fresh f = MicroKanren.fresh_ f
 
 a_var = A "var"
 a_app = A "app"
@@ -85,4 +89,4 @@ ex3 = tst $ fresh $ \(kc,ty) ->
 
 
 
-ex10 = let (a,b) = (V(-1),V(-2)) in tst $ fresh $ \kc -> do{ kind_ kc (arr a b) star; kc' <- expand' kc; a' <- expand' a; b' <- expand' b; return (a',b',kc') }
+ex10 = let (a,b) = (V(Var (-1) ""),V(Var (-2) "")) in tst $ fresh $ \kc -> do{ kind_ kc (arr a b) star; kc' <- expand' kc; a' <- expand' a; b' <- expand' b; return (a',b',kc') }

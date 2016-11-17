@@ -1,12 +1,15 @@
 -- vim: ts=2: sw=2: expandtab: ai:
 
-import MicroKanren
+import MicroKanren hiding (fresh, fresh_)
+import qualified MicroKanren (fresh_)
 import ExampleMember
 
 import Control.Applicative
 import Control.Monad
 
 import Debug.Trace (trace)
+
+fresh f = MicroKanren.fresh_ f
 
 a_var = A "var"
 a_app = A "app"
@@ -36,7 +39,7 @@ instTy kc tsch t =
   ( fresh $ \(c,t1,t2) ->
       do { tsch `eq` poly c t1
          ; s <- copy_term (poly c t1) (poly c t2)
-         ; ks <- sequence [newVar | _ <- s]
+         ; ks <- sequence [newVar"" | _ <- s]
          ; t `eq` t2 -- do this later here because t may not be var
          ; return $ concat -- new tyvars must be the same kind
                   [ [ L[A"kind",kc,V v1,V k]
@@ -102,9 +105,9 @@ type__ kc ctx tm ty = do
   gs_ <- mapM expand' gs
   let vs = usort [x | x <-concatMap fv (ty_:[ty | L[_,_,ty,_]<- gs_])]
   conjs [V x `eq` var(A $ "_"++show x) | x <- vs]
-  xks <- sequence [(,) <$> pure x <*> newVar | x <- vs]
+  xks <- sequence [(,) <$> pure x <*> newVar"" | x <- vs]
   let kclist = [pair (A $ "_"++show x) (V k) | (x,k) <- xks]
-  kc0 <- V <$> newVar
+  kc0 <- V <$> newVar""
   kc `eq` foldr cons kc0 kclist
   gs_ <- mapM expand' gs
   conjs [ kind_ kctx t k | L[A"kind",kctx,t,k] <- gs_]
@@ -127,5 +130,5 @@ ex3 = tst $ fresh $ \(kc,ty) ->
   where (x,y) = (A"x",A"y")
 
 
-ex10 = let (a,b) = (V(-1),V(-2)) in tst $ fresh $ \kc -> do{ kind_ kc (arr a b) star; kc' <- expand' kc; a' <- expand' a; b' <- expand' b; return (a',b',kc') }
+ex10 = let (a,b) = (V(Var (-1) ""),V(Var (-2) "")) in tst $ fresh $ \kc -> do{ kind_ kc (arr a b) star; kc' <- expand' kc; a' <- expand' a; b' <- expand' b; return (a',b',kc') }
 
